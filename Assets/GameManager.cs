@@ -66,8 +66,8 @@ public class GameManager : MonoBehaviour
             while (true)
             {
                 // get a number key input, check if it has been used, and if it is between 1-6 to assign to stats 1-6,
-                numDown = CheckForNumberKeyInput();
-                yield return null;
+                yield return numDown = CheckForNumberKeyInput();
+                
                 if (numDown > 0 && numDown <= 6 ) {
 
                     if (CheckIfDiceSlotUsed(numDown))
@@ -77,7 +77,7 @@ public class GameManager : MonoBehaviour
                     }
                     else { Debug.Log("Dice Slot Already Used"); }
                 }
-                else { Debug.Log("Number not between 1-6"); }
+                
             }
                 newRollOrder[i] = roll.rolls[numDown - 1];
             // assign the roll from element number you clicked to the new order. 

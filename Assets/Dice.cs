@@ -6,7 +6,7 @@ using System;
 public class Dice : MonoBehaviour
 {
     public static Dice instance;
-    public List<DiceRoll> diceRollHistory = new();
+    public List<DiceRoll> diceRollHistory = new List<DiceRoll>();
 
     private void Awake()
     {
