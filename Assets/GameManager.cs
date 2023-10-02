@@ -4,15 +4,24 @@ using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
+    public static GameManager instance;
     public GameState currentGameState = GameState.StatSelect;
     public int currentPlayerTurn = 0;
     public PlayerScript[] players;
 
 
+    private void Awake()
+    {
+        if(instance != null)
+        {
+            Destroy(this);
+        }
+        else { instance = this; }
+    }
     // Start is called before the first frame update
     void Start()
     {
-        
+        Application.targetFrameRate = 60;   
         StartCoroutine(PlayerSelectStats());
     }
 

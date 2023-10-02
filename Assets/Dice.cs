@@ -7,6 +7,7 @@ public class Dice : MonoBehaviour
 {
     public static Dice instance;
     public List<DiceRoll> diceRollHistory = new List<DiceRoll>();
+    public GameObject d6Prefab;
 
     private void Awake()
     {
