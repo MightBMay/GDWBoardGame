@@ -19,7 +19,7 @@ public class Dice : MonoBehaviour
     }
     public DiceRoll RollNSidedDice(int diceCount = 1)
     {
-        
+
         DiceRoll roll = new DiceRoll(diceCount);
         diceRollHistory.Add(roll);
         return roll;
@@ -28,12 +28,12 @@ public class Dice : MonoBehaviour
     public DiceRoll RollNSidedDice(int min = 1, int max = 6, int diceCount = 1)
     {
 
-        DiceRoll roll = new DiceRoll(min,max,1);
+        DiceRoll roll = new DiceRoll(min, max, 1);
         diceRollHistory.Add(roll);
-        return roll ;
-        
+        return roll;
+
     }
-    
+
     [System.Serializable]
     public class DiceRoll
     {
@@ -63,13 +63,13 @@ public class Dice : MonoBehaviour
             {
                 int diceValue = Mathf.FloorToInt(UnityEngine.Random.Range(min, max));
                 rolls[x] = diceValue;
-                sum += diceValue ;
+                sum += diceValue;
             }
         }
         public DiceRoll(int[] setValues)// for the event you need a dice roll, but must manually set the values.
         {
             rolls = setValues;
-            foreach(int i in this.rolls)
+            foreach (int i in this.rolls)
             {
                 sum += i;
             }
@@ -83,7 +83,7 @@ public class Dice : MonoBehaviour
         public string DiceRollToString(DiceRollSortMode sortMode)
         {
             string str = "";// make blank string
-            if (sortMode == DiceRollSortMode.None)                     
+            if (sortMode == DiceRollSortMode.None)
             {
 
                 foreach (int i in this.rolls)
@@ -91,7 +91,7 @@ public class Dice : MonoBehaviour
                     str += i.ToString() + ", "; // adds the string for each value in the array
                 }
             }
-            else if(sortMode== DiceRollSortMode.MaxToMin)
+            else if (sortMode == DiceRollSortMode.MaxToMin)
             {
                 Array.Sort(this.rolls); //sorts from lowest to highest,
                 Array.Reverse(this.rolls); // then reverses it, so it's highest to lowest.
@@ -103,7 +103,7 @@ public class Dice : MonoBehaviour
             else if (sortMode == DiceRollSortMode.MinToMax)
             {
                 Array.Sort(this.rolls); // sorts from lowest to highest.
-                
+
                 foreach (int i in this.rolls)
                 {
                     str += i.ToString() + ", "; // adds the string for each value in the array

@@ -7,7 +7,12 @@ public class GameManager : MonoBehaviour
     public static GameManager instance;
     public GameState currentGameState = GameState.StatSelect;
     public int currentPlayerTurn = 0;
-    public PlayerScript[] players;
+    public List<PlayerScript> players = new List<PlayerScript>();
+    int roundnumber = 0;
+    public Transform cardHolder;
+    public GameObject scenarioCard,ScenarioCardHolder;
+    public GameObject blankCardPrefab;
+    public GameObject searchIconPrefab, attackIconPrefab, defendIconPrefab;
 
 
     private void Awake()
@@ -28,100 +33,246 @@ public class GameManager : MonoBehaviour
     public IEnumerator GameLoop()
     {
         yield return StartCoroutine(PlayerSelectStats());
-        yield return new WaitUntil(() => currentGameState != GameState.StatSelect);
-        yield return StartCoroutine(SelectCard());
-        yield return new WaitUntil(() => currentGameState != GameState.CardSelect);
-        yield return StartCoroutine(CheckScenarioOnSelected());
-        yield return new WaitUntil(() => currentGameState != GameState.CardCompare);
+        yield return new WaitUntil(() => currentGameState != GameState.StatSelect);// makes it wait for the playerselectstats coroutine to recursively loop through all players.
+
+        foreach (PlayerScript ps in players) // remove temp text that shows your dice rolls, and draws 4 cards.
+        {
+            PlayerDrawCard(ps, 4);
+            ps.AssignTemperaryText("");
+        }
+
+        scenarioCard.SetActive(true);
+
+
+        while (true) // main gameplay loop of selecting cards to compare to scenario card.
+        {
+            Debug.Log("round #: " + roundnumber);
+            DeckManager.instance.AssignNewScenarioCard();// select new scenario.
+            ScenarioCardHolder.GetComponent<VisibleCard>().UpdateCardText(DeckManager.instance.currentScenarioCard, true);
+
+            yield return StartCoroutine(SelectCard());
+            yield return new WaitUntil(() => currentGameState != GameState.CardSelect); // makes it wait for the selectcard coroutine to recursively loop through all players.
+            roundnumber++;
+            foreach (PlayerScript ps in players)
+            {
+                PlayerDrawCard(ps);
+                UpdatePlayerStats(ps);
+            }
+            if (CheckPlayerDeaths())
+            {
+                currentGameState = GameState.EndGame;
+                break;
+            }
+        }
+
+        Debug.Log("GameOver");
 
     }
-    IEnumerator CheckScenarioOnSelected()
+    public void UpdatePlayerStats(PlayerScript player)
     {
-        
-        if (ScenarioCheckToSelected())
+        player.AssignTextFromStats(player.stats);
+    }
+    public void PlayerDrawCard(PlayerScript player, int quantity = 1)
+    {
+        for (int i = 0; i < quantity; i++)
         {
-            //whatever happens when you have the correct amount of cards
-            Debug.Log("yipee");
+            // pick number from 0-total deck length, round to int with cast, return that index as a card.
+            player.stats.playerDeck.Add(DeckManager.instance.GetRandomActionCard((int)Random.Range(0, DeckManager.instance.allActionCards.Count)));
         }
-        else {
-            //whatever happens when you do not have the correct amount of cards
-            Debug.Log("arr naur");
-        }
-        currentGameState = GameState.Idle;
-        yield return null;
+    }
 
-
-
-
-        bool ScenarioCheckToSelected()
+    public void PlayerDiscardRandom(PlayerScript player, int quantity = 1, bool redraw = false)
+    {
+        for (int i = 0; i < quantity; i++)
         {
-            int attack = 0, defence = 0, search = 0;
-            ScenarioCard sceneCard = DeckManager.instance.currentScenarioCard;
-            // checks if the cards selected by players collectevly surpass the ScenarioCard.cardStrength while taking card type into account.
-            foreach (PlayerScript player in GameManager.instance.players)
+            int index = (int)Random.Range(0, player.stats.playerDeck.Count);
+            player.stats.playerDeck.RemoveAt(index);
+
+            if (redraw)
             {
+                PlayerDrawCard(player);
+            }
+        }
+    }
+    public bool CheckPlayerDeaths()
+    {
 
-                switch (player.selectedCard.cardType)
+        if (players.Count <= 0)
+        {
+            Debug.Log("All players have died.");
+            return true;
+        }
+        else
+        {
+            List<PlayerScript> playersToRemove = new List<PlayerScript>();
+
+            foreach (PlayerScript ps in players)
+            {
+                if (ps.stats.vitality <= 0 || ps.stats.sanity <= 0)
                 {
-                    case DeckManager.CardType.Attack:
-                        attack++;
-                        break;
+                    int ind = players.IndexOf(ps);
+                    foreach (Card c in ps.stats.playerDeck)
+                    {
+                        DeckManager.instance.allActionCards.Add(c);
+                    }
 
-                    case DeckManager.CardType.Defend:
-                        defence++;
-                        break;
-
-                    case DeckManager.CardType.Search:
-                        search++;
-                        break;
-
-
-                    default:
-                        Debug.Log("card checked against scenario has no type??");
-                        break;
+                    playersToRemove.Add(ps);
+                    Debug.Log("PLAYER #" + ind + " HAS DIED");
                 }
-
             }
 
-            Debug.Log("attack/Required: " + attack + " / " + sceneCard.attackStrength);
-            Debug.Log("defence/Required: " + defence + " / " + sceneCard.defenceStrength);
-            Debug.Log("search/Required: " + search + " / " + sceneCard.searchStrength);
-            return sceneCard.attackStrength <= attack && sceneCard.defenceStrength <= defence && sceneCard.searchStrength <= search;
+            // Remove the players marked for removal from the original list
+            foreach (PlayerScript psToRemove in playersToRemove)
+            {
+                players.Remove(psToRemove);
+            }
+            return false;
         }
     }
 
     IEnumerator SelectCard()
     {
         Card selectedCard;
+        List<GameObject> shownCardList = new List<GameObject>();
+
+
         // stops after looping through the 4 players.
-        if (currentPlayerTurn < players.Length)
+        if (currentPlayerTurn < players.Count)
         {
             currentGameState = GameState.CardSelect; // a
+
+
+
+
             int numPressed;
-            Debug.Log("press number 1 - 4 to select card");
+            ShowCards(players[currentPlayerTurn].stats);
+            Debug.Log("press number 1 - 4 to select card, or 0 to Pass.");
             while (true)
             {
                 yield return numPressed = CheckForNumberKeyInput();
-                if (numPressed <= players[currentPlayerTurn].stats.playerDeck.Count && numPressed > 0)
+                if (numPressed == 0)
                 {
-                   selectedCard = players[currentPlayerTurn].selectedCard = players[currentPlayerTurn].stats.playerDeck[numPressed-1];
+                    selectedCard = players[currentPlayerTurn].selectedCard = null;
+                    break;
+                }
+                else if (numPressed <= players[currentPlayerTurn].stats.playerDeck.Count && numPressed > 0)
+                {
+                    selectedCard = players[currentPlayerTurn].selectedCard = players[currentPlayerTurn].stats.playerDeck[numPressed - 1]; // assigns the selected card to the playerscript and a local variable to run later.
                     break;
                 }
 
             }
-            Debug.Log(selectedCard.cardName + " selected");
+
+            if (selectedCard != null)
+            {
+                Debug.Log(selectedCard.cardName + " selected");
+                yield return StartCoroutine( selectedCard.OnPlay() );
+                players[currentPlayerTurn].stats.playerDeck.Remove(selectedCard);
+                
+            }
+            HideCards();
             currentPlayerTurn++;
+            foreach (PlayerScript ps in players) { UpdatePlayerStats(ps); }
             StartCoroutine(SelectCard());
 
         }
-        else { currentPlayerTurn = 0; currentGameState = GameState.CardCompare; yield break;  }
+        else
+        {
+            currentPlayerTurn = 0; // reset turn counter.
+            currentGameState = GameState.Idle; // move to next GameState
+            bool requirementsMet = ScenarioCheckToSelected(); // checks if the players selected cards meed the search/attck/defend requirements to succeed.
+            foreach (PlayerScript ps in players)
+            {
+                if (ps.selectedCard != null)
+                {
+                    ps.selectedCard.OnRoundEnd(requirementsMet); // runs turn end effects on action cards.
+
+                }
+            }
+
+            DeckManager.instance.currentScenarioCard.OnRoundEnd(requirementsMet); // runs turn end effects on scenario card.
+
+            yield break;
+        }
+
+        List<VisibleCard> ShowCards(PlayerStats stats)
+        {
+            List<VisibleCard> visCards = new List<VisibleCard>();
+            foreach (Card c in stats.playerDeck)
+            {
+                GameObject newCard = Instantiate(blankCardPrefab);
+                newCard.transform.SetParent(cardHolder);
+                visCards.Add(newCard.GetComponent<VisibleCard>());
+                newCard.GetComponent<VisibleCard>().UpdateCardText(c, false);
+                shownCardList.Add(newCard);
+            }
+            return visCards;
+
+        }
+
+        void HideCards()
+        {
+            List<GameObject> shownCardListCopy = shownCardList;
+            foreach (GameObject g in shownCardListCopy)
+            {
+                Destroy(g);
+            }
+            shownCardList.Clear();
+        }
     }
 
+
+    bool ScenarioCheckToSelected()
+    {
+        int attack = 0, defend = 0, search = 0;
+        ScenarioCard sceneCard = DeckManager.instance.currentScenarioCard;
+        // checks if the cards selected by players collectevly surpass the ScenarioCard.cardStrength while taking card type into account.
+        foreach (PlayerScript player in GameManager.instance.players)
+        {
+            if (player.selectedCard != null)
+            {
+                foreach (DeckManager.CardType type in player.selectedCard.cardTypes)
+                {
+                    switch (type)
+                    {
+                        case DeckManager.CardType.Attack:
+                            attack++;
+                            break;
+
+                        case DeckManager.CardType.Defend:
+                            defend++;
+                            break;
+
+                        case DeckManager.CardType.Search:
+                            search++;
+                            break;
+
+
+                        default:
+                            Debug.Log("card checked against scenario has no type??");
+                            break;
+                    }
+                }
+            }
+
+        }
+        foreach (CardStrengths c in sceneCard.cardStrengths)
+        {
+            if (c.CheckRequirements(search, attack, defend))
+            {
+                Debug.Log("Scenerio Successful");
+                return true;
+            }
+        }
+
+        Debug.Log("Scenerio Unsuccessful");
+        return false;
+    }
 
     public IEnumerator PlayerSelectStats()
     {
         //uses recursion, exit case is when you have looped through all players.
-        if (currentPlayerTurn < players.Length)
+        if (currentPlayerTurn < players.Count)
         {
             currentGameState = GameState.StatSelect;
             //temp message will be replaced with proper text later
@@ -132,8 +283,7 @@ public class GameManager : MonoBehaviour
 
             //prerolls all 6 stats
             var rollx2 = Dice.instance.RollNSidedDice(2);
-            players[currentPlayerTurn].
-            AssignTemperaryText(rollx2.DiceRollToString(Dice.DiceRoll.DiceRollSortMode.MinToMax));
+            players[currentPlayerTurn].AssignTemperaryText(rollx2.DiceRollToString(Dice.DiceRoll.DiceRollSortMode.MinToMax));
             //^^ assigns the 6 values of the prerolled dice to a TMProUGUI so you can see your rolls.
             yield return StartCoroutine(ReorderStats(rollx2));// begins the Stat Selection Coroutine.
 
@@ -195,7 +345,7 @@ public class GameManager : MonoBehaviour
             return true;
         }
     }
-    int CheckForNumberKeyInput()
+    public int CheckForNumberKeyInput()
     {
 
 
